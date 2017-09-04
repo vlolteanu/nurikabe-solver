@@ -324,7 +324,7 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 	//cout << "conquered" << endl;
 	
 	reachable->insert(pair<int, int>(x, y));
-	if (cell->state == Cell::S_WHITE && !cell->claimed && cell->possibleOwners.size() == 1)
+	if (satellites && cell->state == Cell::S_WHITE && !cell->claimed && cell->possibleOwners.size() == 1)
 		satellites->insert(pair<int, int>(x, y));
 	
 	floodExplore(table, island, x + 1, y    , distance - 1, reachable, satellites);
@@ -425,6 +425,23 @@ bool checkReachability(Table *table)
 		BOOST_FOREACH(coords, unreachable)
 		{
 			change |= declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+		}
+		
+		BOOST_FOREACH(coords, satellites)
+		{
+			set<pair<int, int> > backwardsReachable;
+			set<pair<int, int> > backwardsUnreachable = reachable;
+			
+			floodExplore(table, island, coords.first, coords.second, island->size, &backwardsReachable, NULL);
+			
+			BOOST_FOREACH(coords, backwardsReachable)
+			{
+				backwardsUnreachable.erase(coords);
+			}
+			BOOST_FOREACH(coords, backwardsUnreachable)
+			{
+				change |= declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+			}
 		}
 	}
 	
