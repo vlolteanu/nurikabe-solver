@@ -486,9 +486,8 @@ void checkBlackSquares(Table *table)
 	}
 }
 
-bool sanity(Table *table)
+void sanity(Table *table)
 {
-	bool ret = false;
 	bool again;
 	do
 	{
@@ -501,20 +500,25 @@ bool sanity(Table *table)
 		again |= checkReachability(table);
 		//cout << "checking black squares" << endl;
 		checkBlackSquares(table);
-		ret |= again;
 	} while (again);
-	
-	return ret;
 }
 
-void solve(Table *table, int depth)
-{	
+bool solve(Table *table, int maxDepth)
+{
+	int depth;
 beginning:
 	
 	sanity(table);
 	
-	if (depth == 0)
-		return;
+	if (table->greyCells.empty())
+		return true;
+	
+	depth = 0;
+deeper:
+	depth++;
+	
+	if (maxDepth < depth)
+		return false;
 	
 	pair<int, int> coords;
 	BOOST_FOREACH(coords, table->greyCells)
@@ -527,7 +531,11 @@ beginning:
 			Table alteration(*table);
 			//cout << "assuming (" << i << "," << j << ") is white" << endl;
 			whitenCell(&alteration, &alteration.cells[x][y]);
-			solve(&alteration, depth - 1);
+			if (solve(&alteration, depth - 1))
+			{
+				*table = alteration;
+				return true;
+			}
 		}
 		catch (Unsolvable)
 		{
@@ -543,7 +551,11 @@ beginning:
 			Table alteration(*table);
 			//cout << "assuming (" << i << "," << j << ") is black" << endl;
 			blackenCell(&alteration, &alteration.cells[x][y]);
-			solve(&alteration, depth - 1);
+			if (solve(&alteration, depth - 1))
+			{
+				*table = alteration;
+				return true;
+			}
 		}
 		catch (Unsolvable)
 		{
@@ -554,6 +566,8 @@ beginning:
 		
 		//cout << "meh" << endl;
 	}
+	
+	goto deeper;
 }
 
 static const int MAX_DEPTH = INT_MAX;
@@ -569,24 +583,12 @@ int main(int argc, char *argv[])
 	Table table = readTable(argv[1]);
 	//cout << "table is " << table.w << " x " << table.h << endl;
 	//dumpTable(table);
-	int depth = 0;
-	while (table.greyCells.size() > 0)
-	{
-		cerr << "DEPTH " << depth << endl;
-		solve(&table, depth);
-		//dumpTable(table);
-		depth++;
-		
-		if (depth > MAX_DEPTH)
-		{
-			cerr << "Max depth reached" << endl;
-			return 1;
-		}
-	}
+	solve(&table, MAX_DEPTH);
+	//dumpTable(table);
 	//cout << "DONE" << endl;
 	dumpTable(table);
 	
-	cerr << "Depth: " << (depth - 1) << endl;
+	//cerr << "Depth: " << (depth - 1) << endl;
 	
 	return 0;
 }
