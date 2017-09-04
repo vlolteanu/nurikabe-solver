@@ -129,7 +129,7 @@ bool claimCell(Table *table, Cell *cell, Island *owner)
 	BOOST_FOREACH(Island *island, possibleOwners)
 	{
 		if (island != owner)
-			cell->possibleOwners.erase(island);
+			declareUnreachable(table, cell, island);
 	}
 	
 	return ret;
