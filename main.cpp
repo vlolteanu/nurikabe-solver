@@ -175,24 +175,19 @@ Table readTable(string filename)
 			
 			cell->x = i;
 			cell->y = lines;
+			cell->state = Cell::S_GREY;
+			table.greyCells.insert(pair<int, int>(i, lines));
 			
 			if (line[i] > '0'  && line[i] <= '9')
 			{
 				Island *island = new Island(i, lines, line[i] - '0');
 				
 				table.islands.push_back(island);
-				
-				cell->state = Cell::S_WHITE;
-				cell->possibleOwners.insert(island);
-				
 				table.unsolvedIslands.insert(island);
-				table.whiteCells.insert(pair<int, int>(i, lines));
 			}
 			else if (line [i] == '.')
 			{
-				cell->state = Cell::S_GREY;
-				
-				table.greyCells.insert(pair<int, int>(i, lines));
+				//Nothing
 			}
 			else
 			{
@@ -203,13 +198,15 @@ Table readTable(string filename)
 	}
 	table.h = lines;
 	
-	for (unsigned i = 0; i < table.w; i++)
+	pair<int, int> coords;
+	BOOST_FOREACH(coords, table.greyCells)
 	{
-		for (unsigned j = 0; j < table.h; j++)
-		{
-			if (table.cells[i][j].possibleOwners.empty())
-				table.cells[i][j].possibleOwners.insert(table.islands.begin(), table.islands.end());
-		}
+		table.cells[coords.first][coords.second].possibleOwners.insert(table.islands.begin(), table.islands.end());
+	}
+	
+	BOOST_FOREACH(Island *island, table.islands)
+	{
+		claimCell(&table, &table.cells[island->x][island->y], island);
 	}
 	
 	return table;
