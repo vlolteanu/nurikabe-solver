@@ -60,10 +60,8 @@ struct Unsolvable {};
 
 bool blackenCell(Table *table, Cell *cell)
 {
-	//cout << "blackening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_WHITE)
 	{
-		//cout << "busted" << endl;
 		throw Unsolvable();
 	}
 	if (cell->state == Cell::S_BLACK)
@@ -80,7 +78,6 @@ bool blackenCell(Table *table, Cell *cell)
 
 bool whitenCell(Table *table, Cell *cell)
 {
-	//cout << "whitening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
 		throw Unsolvable();
 	if (cell->state == Cell::S_WHITE)
@@ -101,7 +98,6 @@ bool claimCell(Table *table, Cell *cell, Island *island)
 {
 	bool ret;
 	
-	//cout << "claiming " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
 		throw Unsolvable();
 	
@@ -130,7 +126,6 @@ bool declareUnreachable(Table *table, Cell *cell, Island *island)
 	bool found = cell->possibleOwners.erase(island) > 0;
 	if (cell->possibleOwners.empty())
 	{
-		//cout << "no owners" << endl;
 		blackenCell(table, cell);
 	}
 	return found;
@@ -145,7 +140,6 @@ Table readTable(string filename)
 	
 	while (getline(infile, line))
 	{
-		//cout << "read " << line << endl;
 		if (lines == 0)
 			table.w = line.size();
 		else if (line.size() != table.w)
@@ -325,10 +319,6 @@ bool drawBorders(Table *table)
 					if (!intersect)
 					{
 						change = true;
-//						cout << "border cell " <<
-//							"(" << neighbours[k]->x << "," << neighbours[k]->y << ") "<<
-//							"(" << neighbours[l]->x << "," << neighbours[l]->y << ") "<<
-//							endl;
 						blackenCell(table, cell);
 						done = true;
 						break;
@@ -343,26 +333,14 @@ bool drawBorders(Table *table)
 
 void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
 {
-	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
 	if (distance == 0)
-	{
-		//cout << "too far" << endl;
 		return;
-	}
 	
 	if (x < 0 || x >= (int)table->w || y < 0 || y >= (int)table->h)
-	{
-		//cout << "oo bounds" << endl;
 		return;
-	}
 	
 	if (table->cells[x][y].possibleOwners.find(island) == table->cells[x][y].possibleOwners.end())
-	{
-		//cout << "not ownable" << endl;
 		return;
-	}
-	
-	//cout << "conquered" << endl;
 	
 	reachable->insert(pair<int, int>(x, y));
 	
@@ -375,18 +353,12 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
 {
 	bool ret = false;
-	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") claim " << x << "," << y << " ";
+	
 	if (distance == 0)
-	{
-		//cout << "too far" << endl;
 		return false;
-	}
 	
 	if (x < 0 || x >= (int)table->w || y < 0 || y >= (int)table->h)
-	{
-		//cout << "oo bounds" << endl;
 		return false;
-	}
 	
 	if (table->cells[x][y].state != Cell::S_WHITE)
 		return false;
@@ -438,10 +410,7 @@ bool checkReachability(Table *table)
 			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable);
 		}
 		if (reachable.size() < island->size)
-		{
-			//cout << "island doesn't fit (" << island->x << "," << island->y << "," << island->size << ")" << endl;
 			throw Unsolvable();
-		}
 		
 		if (reachable.size() == island->size)
 		{
@@ -496,13 +465,9 @@ beginning:
 	do
 	{
 		again = false;
-		//cout << "checking black reachability" << endl;
 		blackReachability(table);
-		//cout << "drawing borders" << endl;
 		again |= drawBorders(table);
-		//cout << "checking reachability" << endl;
 		again |= checkReachability(table);
-		//cout << "checking black squares" << endl;
 		checkBlackSquares(table);
 	} while (again);
 	
@@ -520,34 +485,26 @@ beginning:
 		try
 		{
 			Table alteration(*table);
-			//cout << "assuming (" << i << "," << j << ") is white" << endl;
 			whitenCell(&alteration, &alteration.cells[x][y]);
 			solve(&alteration, depth - 1);
 		}
 		catch (Unsolvable)
 		{
-			//cout << "nope, blackening (" << i << "," << j << ")" << endl;
 			blackenCell(table, &table->cells[x][y]);
 			goto beginning;
 		}
 		
-		//cout << "meh" << endl;
-		
 		try
 		{
 			Table alteration(*table);
-			//cout << "assuming (" << i << "," << j << ") is black" << endl;
 			blackenCell(&alteration, &alteration.cells[x][y]);
 			solve(&alteration, depth - 1);
 		}
 		catch (Unsolvable)
 		{
-			//cout << "nope, whitening (" << i << "," << j << ")" << endl;
 			whitenCell(table, &table->cells[x][y]);
 			goto beginning;
 		}
-		
-		//cout << "meh" << endl;
 	}
 }
 
@@ -560,16 +517,14 @@ int main(int argc, char *argv[])
 	}
 	
 	Table table = readTable(argv[1]);
-	//cout << "table is " << table.w << " x " << table.h << endl;
 	int depth = 0;
+	
 	while (table.greyCells.size() > 0)
 	{
-		//cout << "DEPTH " << depth << endl;
 		solve(&table, depth);
-		//dumpTable(table);
 		depth++;
 	}
-	//cout << "DONE" << endl;
+	
 	dumpTable(table);
 	
 	return 0;
