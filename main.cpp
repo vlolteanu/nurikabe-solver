@@ -131,7 +131,7 @@ bool whitenCell(Table *table, Cell *cell)
 
 bool declareOwner(Table *table, Cell *cell, Island *owner)
 {
-	bool ret;
+	bool ret = false;
 	
 	//cout << "claiming " << cell->x << " " << cell->y << endl;
 	
@@ -139,7 +139,7 @@ bool declareOwner(Table *table, Cell *cell, Island *owner)
 	BOOST_FOREACH(Island *island, possibleOwners)
 	{
 		if (island != owner)
-			declareUnreachable(table, cell, island);
+			ret |= declareUnreachable(table, cell, island);
 	}
 	
 	return ret;
@@ -214,7 +214,7 @@ Table readTable(string filename)
 	
 	BOOST_FOREACH(Island *island, table.islands)
 	{
-		whitenCell(table, &table.cells[island->x][island->y]);
+		whitenCell(&table, &table.cells[island->x][island->y]);
 		declareOwner(&table, &table.cells[island->x][island->y], island);
 	}
 	
