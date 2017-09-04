@@ -296,7 +296,7 @@ void blackReachability(const Table *table)
 		throw Unsolvable();
 }
 
-void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable, set<pair<int, int> > *annexes)
+void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
 {
 	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
 	if (distance == 0)
@@ -323,13 +323,10 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 	
 	reachable->insert(pair<int, int>(x, y));
 	
-	if (cell->possibleOwners.size() == 1 && cell->state == Cell::S_WHITE)
-		annexes->insert(pair<int, int>(x, y));
-	
-	floodExplore(table, island, x + 1, y    , distance - 1, reachable, annexes);
-	floodExplore(table, island, x - 1, y    , distance - 1, reachable, annexes);
-	floodExplore(table, island, x    , y + 1, distance - 1, reachable, annexes);
-	floodExplore(table, island, x    , y - 1, distance - 1, reachable, annexes);
+	floodExplore(table, island, x + 1, y    , distance - 1, reachable);
+	floodExplore(table, island, x - 1, y    , distance - 1, reachable);
+	floodExplore(table, island, x    , y + 1, distance - 1, reachable);
+	floodExplore(table, island, x    , y - 1, distance - 1, reachable);
 }
 
 bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
@@ -374,7 +371,6 @@ bool checkReachability(Table *table)
 		set<pair<int, int> > reachable;
 		set<pair<int, int> > unreachable;
 		set<pair<int, int> > claimed;
-		set<pair<int, int> > annexes;
 		
 		change |= floodClaim(table, island, island->x, island->y, island->size, &claimed);
 		if (claimed.size() > island->size)
@@ -397,7 +393,7 @@ bool checkReachability(Table *table)
 		
 		BOOST_FOREACH(coords, claimed)
 		{
-			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable, &annexes);
+			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable);
 		}
 		if (reachable.size() < island->size)
 		{
