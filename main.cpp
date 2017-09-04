@@ -535,5 +535,7 @@ int main(int argc, char *argv[])
 	
 	dumpTable(table);
 	
+	cerr << "Max depth: " << (depth - 1) << endl;
+	
 	return 0;
 }
