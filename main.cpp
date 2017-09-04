@@ -129,12 +129,11 @@ bool whitenCell(Table *table, Cell *cell)
 	return true;
 }
 
-bool claimCell(Table *table, Cell *cell, Island *owner)
+bool declareOwner(Table *table, Cell *cell, Island *owner)
 {
 	bool ret;
 	
 	//cout << "claiming " << cell->x << " " << cell->y << endl;
-	ret = whitenCell(table, cell);
 	
 	set<Island *> possibleOwners = cell->possibleOwners;
 	BOOST_FOREACH(Island *island, possibleOwners)
@@ -215,7 +214,8 @@ Table readTable(string filename)
 	
 	BOOST_FOREACH(Island *island, table.islands)
 	{
-		claimCell(&table, &table.cells[island->x][island->y], island);
+		whitenCell(table, &table.cells[island->x][island->y]);
+		declareOwner(&table, &table.cells[island->x][island->y], island);
 	}
 	
 	return table;
@@ -296,7 +296,7 @@ void blackReachability(const Table *table)
 		throw Unsolvable();
 }
 
-void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
+void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable, set<pair<int, int> > *annexes)
 {
 	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
 	if (distance == 0)
@@ -311,7 +311,9 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 		return;
 	}
 	
-	if (table->cells[x][y].possibleOwners.find(island) == table->cells[x][y].possibleOwners.end())
+	Cell *cell = &table->cells[x][y];
+	
+	if (cell->possibleOwners.find(island) == cell->possibleOwners.end())
 	{
 		//cout << "not ownable" << endl;
 		return;
@@ -321,10 +323,13 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 	
 	reachable->insert(pair<int, int>(x, y));
 	
-	floodExplore(table, island, x + 1, y    , distance - 1, reachable);
-	floodExplore(table, island, x - 1, y    , distance - 1, reachable);
-	floodExplore(table, island, x    , y + 1, distance - 1, reachable);
-	floodExplore(table, island, x    , y - 1, distance - 1, reachable);
+	if (cell->possibleOwners.size() == 1 && cell->state == Cell::S_WHITE)
+		annexes->insert(pair<int, int>(x, y));
+	
+	floodExplore(table, island, x + 1, y    , distance - 1, reachable, annexes);
+	floodExplore(table, island, x - 1, y    , distance - 1, reachable, annexes);
+	floodExplore(table, island, x    , y + 1, distance - 1, reachable, annexes);
+	floodExplore(table, island, x    , y - 1, distance - 1, reachable, annexes);
 }
 
 bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
@@ -346,7 +351,8 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	if (table->cells[x][y].state != Cell::S_WHITE)
 		return false;
 	
-	ret |= claimCell(table, &table->cells[x][y], island);
+	ret |= whitenCell(table, &table->cells[x][y]);
+	ret |= declareOwner(table, &table->cells[x][y], island);
 	
 	claimed->insert(pair<int, int>(x, y));
 	
@@ -368,6 +374,7 @@ bool checkReachability(Table *table)
 		set<pair<int, int> > reachable;
 		set<pair<int, int> > unreachable;
 		set<pair<int, int> > claimed;
+		set<pair<int, int> > annexes;
 		
 		change |= floodClaim(table, island, island->x, island->y, island->size, &claimed);
 		if (claimed.size() > island->size)
@@ -390,7 +397,7 @@ bool checkReachability(Table *table)
 		
 		BOOST_FOREACH(coords, claimed)
 		{
-			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable);
+			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable, &annexes);
 		}
 		if (reachable.size() < island->size)
 		{
@@ -403,7 +410,8 @@ bool checkReachability(Table *table)
 			BOOST_FOREACH(coords, reachable)
 			{
 				Cell *cell = &table->cells[coords.first][coords.second];
-				claimCell(table, cell, island);
+				whitenCell(table, cell);
+				declareOwner(table, cell, island);
 			}
 			table->unsolvedIslands.erase(island);
 		}
