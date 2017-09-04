@@ -583,7 +583,8 @@ int main(int argc, char *argv[])
 	Table table = readTable(argv[1]);
 	//cout << "table is " << table.w << " x " << table.h << endl;
 	//dumpTable(table);
-	solve(&table, MAX_DEPTH);
+	if (!solve(&table, MAX_DEPTH))
+		throw Unsolvable();
 	//dumpTable(table);
 	//cout << "DONE" << endl;
 	dumpTable(table);
