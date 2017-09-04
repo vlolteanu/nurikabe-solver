@@ -296,66 +296,6 @@ void blackReachability(const Table *table)
 		throw Unsolvable();
 }
 
-bool drawBorders(Table *table)
-{
-	bool change = false;
-	
-	for (unsigned i = 0; i < table->w; i++)
-	{
-		for (unsigned j = 0; j < table->h; j++)
-		{
-			Cell *cell = &table->cells[i][j];
-			
-			if (cell->state == Cell::S_BLACK)
-				continue;
-			
-			bool done = false;
-			
-			vector<Cell *>neighbours = getNeighbours(table, cell);
-			
-			for (int k = 0; k < (int)neighbours.size() - 1; k++)
-			{
-				if (done)
-					break;
-				
-				if (neighbours[k]->state != Cell::S_WHITE)
-					continue;
-				
-				for (int l = 1; l < (int)neighbours.size(); l++)
-				{
-					if (neighbours[l]->state != Cell::S_WHITE)
-						continue;
-					
-					bool intersect = false;
-					
-					BOOST_FOREACH(Island *island, neighbours[k]->possibleOwners)
-					{
-						if (neighbours[l]->possibleOwners.find(island) != neighbours[l]->possibleOwners.end())
-						{
-							intersect = true;
-							break;
-						}
-					}
-					
-					if (!intersect)
-					{
-						change = true;
-//						cout << "border cell " <<
-//							"(" << neighbours[k]->x << "," << neighbours[k]->y << ") "<<
-//							"(" << neighbours[l]->x << "," << neighbours[l]->y << ") "<<
-//							endl;
-						blackenCell(table, cell);
-						done = true;
-						break;
-					}
-				}
-			}
-		}
-	}
-	
-	return change;
-}
-
 void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
 {
 	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
