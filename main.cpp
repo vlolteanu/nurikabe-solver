@@ -10,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
+#include <limits.h>
 
 using namespace std;
 using namespace boost;
@@ -484,6 +485,7 @@ void checkBlackSquare(Table *table, unsigned x, unsigned y)
 				return;
 		}
 	}
+	//cout << "black square " << x << "," << y << endl;
 	throw Unsolvable();
 }
 
@@ -559,7 +561,7 @@ beginning:
 	}
 }
 
-static const int MAX_DEPTH = 2;
+static const int MAX_DEPTH = INT_MAX;
 
 int main(int argc, char *argv[])
 {
@@ -571,10 +573,11 @@ int main(int argc, char *argv[])
 	
 	Table table = readTable(argv[1]);
 	//cout << "table is " << table.w << " x " << table.h << endl;
+	//dumpTable(table);
 	int depth = 0;
 	while (table.greyCells.size() > 0)
 	{
-		//cout << "DEPTH " << depth << endl;
+		cerr << "DEPTH " << depth << endl;
 		solve(&table, depth);
 		//dumpTable(table);
 		depth++;

@@ -15,12 +15,12 @@ extract()
 	for i in $(seq 0 8)
 	do
 		off=$((9 * i))
-		echo ${line:$off:8} 
+		echo ${line:$off:9} 
 	done
 }
 
 extract puzzle/$1.raw puzzle > puzzle/$1.puzzle
 extract puzzle/$1.raw solpuz > solpuz/$1.sol
 
-rm puzzle/$1.raw
+#rm puzzle/$1.raw
 

@@ -2,8 +2,9 @@
 
 mkdir -p result
 
-for i in $(ls *.txt)
+for i in $(ls puzzle/*.puzzle)
 do
 	echo $i
-	$(which time) ./nurikabe $i > result/$i.res 2> result/$i.err
+	name=$(echo $i | cut -d '/' -f 2 | cut -d '.' -f 1)
+	$(which time) ./nurikabe $i > result/$name.res 2> result/$name.err
 done
