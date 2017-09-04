@@ -163,100 +163,6 @@ bool declareUnreachable(Table *table, Cell *cell, Island *island)
 	return ret;
 }
 
-Table readTable(string filename)
-{
-	ifstream infile(filename.c_str());
-	string line;
-	Table table;
-	unsigned lines = 0;
-	
-	while (getline(infile, line))
-	{
-		//cout << "read " << line << endl;
-		if (lines == 0)
-			table.w = line.size();
-		else if (line.size() != table.w)
-			throw exception();
-		for (unsigned i = 0; i < table.w; i++)
-		{
-			Cell *cell = &table.cells[i][lines];
-			
-			cell->x = i;
-			cell->y = lines;
-			cell->state = Cell::S_GREY;
-			cell->claimed = false;
-			table.greyCells.insert(pair<int, int>(i, lines));
-			
-			if (line[i] > '0'  && line[i] <= '9')
-			{
-				Island *island = new Island(i, lines, line[i] - '0');
-				
-				table.islands.push_back(island);
-				table.unsolvedIslands.insert(island);
-			}
-			else if (line [i] == '.')
-			{
-				//Nothing
-			}
-			else
-			{
-				throw exception();
-			}
-		}
-		lines++;
-	}
-	table.h = lines;
-	
-	pair<int, int> coords;
-	BOOST_FOREACH(coords, table.greyCells)
-	{
-		table.cells[coords.first][coords.second].possibleOwners.insert(table.islands.begin(), table.islands.end());
-	}
-	
-	BOOST_FOREACH(Island *island, table.islands)
-	{
-		whitenCell(&table, &table.cells[island->x][island->y]);
-		declareOwner(&table, &table.cells[island->x][island->y], island);
-	}
-	
-	return table;
-}
-
-void dumpTable(const Table &table)
-{
-	for (unsigned j = 0; j < table.h; j++)
-	{
-		for (unsigned i = 0; i < table.w; i++)
-		{
-			Cell::State state = table.cells[i][j].state;
-			if (state == Cell::S_BLACK)
-			{
-				cout << "#";
-			}
-			else if (state == Cell::S_GREY)
-			{
-				cout << ".";
-			}
-			else
-			{
-				bool found = false;
-				BOOST_FOREACH (const Island *island, table.islands)
-				{
-					if (island->x == i && island->y == j)
-					{
-						cout << island->size;
-						found = true;
-						break;
-					}
-				}
-				if (!found)
-					cout << " ";
-			}
-		}
-		cout << endl;
-	}
-}
-
 void floodBlackReachability(const Table *table, set<pair<int, int> > *blacks, set<pair<int, int> > *visited, const pair<int, int> &start)
 {
 	int x = start.first;
@@ -551,7 +457,99 @@ deeper:
 	goto deeper;
 }
 
-static const int MAX_DEPTH = INT_MAX;
+Table readTable(string filename)
+{
+	ifstream infile(filename.c_str());
+	string line;
+	Table table;
+	unsigned lines = 0;
+	
+	while (getline(infile, line))
+	{
+		//cout << "read " << line << endl;
+		if (lines == 0)
+			table.w = line.size();
+		else if (line.size() != table.w)
+			throw exception();
+		for (unsigned i = 0; i < table.w; i++)
+		{
+			Cell *cell = &table.cells[i][lines];
+			
+			cell->x = i;
+			cell->y = lines;
+			cell->state = Cell::S_GREY;
+			cell->claimed = false;
+			table.greyCells.insert(pair<int, int>(i, lines));
+			
+			if (line[i] > '0'  && line[i] <= '9')
+			{
+				Island *island = new Island(i, lines, line[i] - '0');
+				
+				table.islands.push_back(island);
+				table.unsolvedIslands.insert(island);
+			}
+			else if (line [i] == '.')
+			{
+				//Nothing
+			}
+			else
+			{
+				throw exception();
+			}
+		}
+		lines++;
+	}
+	table.h = lines;
+	
+	pair<int, int> coords;
+	BOOST_FOREACH(coords, table.greyCells)
+	{
+		table.cells[coords.first][coords.second].possibleOwners.insert(table.islands.begin(), table.islands.end());
+	}
+	
+	BOOST_FOREACH(Island *island, table.islands)
+	{
+		whitenCell(&table, &table.cells[island->x][island->y]);
+		declareOwner(&table, &table.cells[island->x][island->y], island);
+	}
+	
+	return table;
+}
+
+void dumpTable(const Table &table)
+{
+	for (unsigned j = 0; j < table.h; j++)
+	{
+		for (unsigned i = 0; i < table.w; i++)
+		{
+			Cell::State state = table.cells[i][j].state;
+			if (state == Cell::S_BLACK)
+			{
+				cout << "#";
+			}
+			else if (state == Cell::S_GREY)
+			{
+				cout << ".";
+			}
+			else
+			{
+				bool found = false;
+				BOOST_FOREACH (const Island *island, table.islands)
+				{
+					if (island->x == i && island->y == j)
+					{
+						cout << island->size;
+						found = true;
+						break;
+					}
+				}
+				if (!found)
+					cout << " ";
+			}
+		}
+		cout << endl;
+	}
+}
 
 int main(int argc, char *argv[])
 {
