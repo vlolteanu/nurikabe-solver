@@ -59,6 +59,8 @@ struct Table
 
 struct Unsolvable {};
 
+bool declareUnreachable(Table *table, Cell *cell, Island *island);
+
 vector<Cell *> getNeighbours(Table *table, Cell *cell)
 {
 	vector<Cell *> ret;
@@ -116,30 +118,19 @@ bool whitenCell(Table *table, Cell *cell)
 	return true;
 }
 
-bool claimCell(Table *table, Cell *cell, Island *island)
+bool claimCell(Table *table, Cell *cell, Island *owner)
 {
 	bool ret;
 	
 	//cout << "claiming " << cell->x << " " << cell->y << endl;
-	if (cell->state == Cell::S_BLACK)
-		throw Unsolvable();
+	ret = whitenCell(table, cell);
 	
-	if (cell->possibleOwners.find(island) == cell->possibleOwners.end())
+	if (cell->possibleOwners.find(owner) == cell->possibleOwners.end())
 		throw Unsolvable();
 	
 	ret = cell->possibleOwners.size() > 1;
 	cell->possibleOwners.clear();
-	cell->possibleOwners.insert(island);
-	
-	if (cell->state == Cell::S_GREY)
-	{
-		cell->state = Cell::S_WHITE;
-		
-		table->greyCells.erase(pair<int, int>(cell->x, cell->y));
-		table->whiteCells.insert(pair<int, int>(cell->x, cell->y));
-		
-		ret = true;
-	}
+	cell->possibleOwners.insert(owner);
 	
 	return ret;
 }
@@ -495,10 +486,9 @@ void checkBlackSquares(Table *table)
 	}
 }
 
-void solve(Table *table, int depth)
-{	
-beginning:
-	
+bool sanity(Table *table)
+{
+	bool ret = false;
 	bool again;
 	do
 	{
@@ -511,12 +501,20 @@ beginning:
 		again |= checkReachability(table);
 		//cout << "checking black squares" << endl;
 		checkBlackSquares(table);
+		ret |= again;
 	} while (again);
+	
+	return ret;
+}
+
+void solve(Table *table, int depth)
+{	
+beginning:
+	
+	sanity(table);
 	
 	if (depth == 0)
 		return;
-	
-	again = false;
 	
 	pair<int, int> coords;
 	BOOST_FOREACH(coords, table->greyCells)
