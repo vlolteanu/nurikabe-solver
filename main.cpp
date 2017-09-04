@@ -10,7 +10,6 @@
 #include <iostream>
 #include <map>
 #include <algorithm>
-#include <limits.h>
 
 using namespace std;
 using namespace boost;
@@ -565,7 +564,7 @@ int main(int argc, char *argv[])
 	Table table = readTable(argv[1]);
 	//cout << "table is " << table.w << " x " << table.h << endl;
 	//dumpTable(table);
-	if (!solve(&table, MAX_DEPTH))
+	if (!solve(&table, table.w * table.h))
 		throw Unsolvable();
 	//dumpTable(table);
 	//cout << "DONE" << endl;
