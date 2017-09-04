@@ -60,10 +60,10 @@ struct Unsolvable {};
 
 bool blackenCell(Table *table, Cell *cell)
 {
-	cout << "blackening " << cell->x << " " << cell->y << endl;
+	//cout << "blackening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_WHITE)
 	{
-		cout << "busted" << endl;
+		//cout << "busted" << endl;
 		throw Unsolvable();
 	}
 	if (cell->state == Cell::S_BLACK)
@@ -80,7 +80,7 @@ bool blackenCell(Table *table, Cell *cell)
 
 bool whitenCell(Table *table, Cell *cell)
 {
-	cout << "whitening " << cell->x << " " << cell->y << endl;
+	//cout << "whitening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
 		throw Unsolvable();
 	if (cell->state == Cell::S_WHITE)
@@ -97,12 +97,40 @@ bool whitenCell(Table *table, Cell *cell)
 	return true;
 }
 
+bool claimCell(Table *table, Cell *cell, Island *island)
+{
+	bool ret;
+	
+	//cout << "claiming " << cell->x << " " << cell->y << endl;
+	if (cell->state == Cell::S_BLACK)
+		throw Unsolvable();
+	
+	if (cell->possibleOwners.find(island) == cell->possibleOwners.end())
+		throw Unsolvable();
+	
+	ret = cell->possibleOwners.size() > 1;
+	cell->possibleOwners.clear();
+	cell->possibleOwners.insert(island);
+	
+	if (cell->state == Cell::S_GREY)
+	{
+		cell->state = Cell::S_WHITE;
+		
+		table->greyCells.erase(pair<int, int>(cell->x, cell->y));
+		table->whiteCells.insert(pair<int, int>(cell->x, cell->y));
+		
+		ret = true;
+	}
+	
+	return ret;
+}
+
 bool declareUnreachable(Table *table, Cell *cell, Island *island)
 {
 	bool found = cell->possibleOwners.erase(island) > 0;
 	if (cell->possibleOwners.empty())
 	{
-		cout << "no owners" << endl;
+		//cout << "no owners" << endl;
 		blackenCell(table, cell);
 	}
 	return found;
@@ -117,7 +145,7 @@ Table readTable(string filename)
 	
 	while (getline(infile, line))
 	{
-		cout << "read " << line << endl;
+		//cout << "read " << line << endl;
 		if (lines == 0)
 			table.w = line.size();
 		else if (line.size() != table.w)
@@ -231,16 +259,8 @@ void floodBlackReachability(const Table *table, set<pair<int, int> > *blacks, se
 
 void blackReachability(const Table *table)
 {
-	set<pair<int, int> > blacks;
+	set<pair<int, int> > blacks = table->blackCells;
 	
-	for (unsigned i = 0; i < table->w; i++)
-	{
-		for (unsigned j = 0; j < table->h; j++)
-		{
-			if (table->cells[i][j].state == Cell::S_BLACK)
-				blacks.insert(pair<int, int>(i, j));
-		}
-	}
 	if (blacks.size() <= 1)
 		return;
 	pair<int, int> start = *blacks.begin();
@@ -305,10 +325,10 @@ bool drawBorders(Table *table)
 					if (!intersect)
 					{
 						change = true;
-						cout << "border cell " <<
-							"(" << neighbours[k]->x << "," << neighbours[k]->y << ") "<<
-							"(" << neighbours[l]->x << "," << neighbours[l]->y << ") "<<
-							endl;
+//						cout << "border cell " <<
+//							"(" << neighbours[k]->x << "," << neighbours[k]->y << ") "<<
+//							"(" << neighbours[l]->x << "," << neighbours[l]->y << ") "<<
+//							endl;
 						blackenCell(table, cell);
 						done = true;
 						break;
@@ -321,9 +341,9 @@ bool drawBorders(Table *table)
 	return change;
 }
 
-void floodConquer(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
+void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
 {
-	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") conquer " << x << "," << y << " ";
+	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
 	if (distance == 0)
 	{
 		//cout << "too far" << endl;
@@ -346,20 +366,61 @@ void floodConquer(Table *table, Island *island, int x, int y, int distance, set<
 	
 	reachable->insert(pair<int, int>(x, y));
 	
-	floodConquer(table, island, x + 1, y    , distance - 1, reachable);
-	floodConquer(table, island, x - 1, y    , distance - 1, reachable);
-	floodConquer(table, island, x    , y + 1, distance - 1, reachable);
-	floodConquer(table, island, x    , y - 1, distance - 1, reachable);
+	floodExplore(table, island, x + 1, y    , distance - 1, reachable);
+	floodExplore(table, island, x - 1, y    , distance - 1, reachable);
+	floodExplore(table, island, x    , y + 1, distance - 1, reachable);
+	floodExplore(table, island, x    , y - 1, distance - 1, reachable);
+}
+
+bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
+{
+	bool ret = false;
+	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") claim " << x << "," << y << " ";
+	if (distance == 0)
+	{
+		//cout << "too far" << endl;
+		return false;
+	}
+	
+	if (x < 0 || x >= (int)table->w || y < 0 || y >= (int)table->h)
+	{
+		//cout << "oo bounds" << endl;
+		return false;
+	}
+	
+	if (table->cells[x][y].state != Cell::S_WHITE)
+		return false;
+	
+	ret |= claimCell(table, &table->cells[x][y], island);
+	
+	claimed->insert(pair<int, int>(x, y));
+	
+	ret |= floodClaim(table, island, x + 1, y    , distance - 1, claimed);
+	ret |= floodClaim(table, island, x - 1, y    , distance - 1, claimed);
+	ret |= floodClaim(table, island, x    , y + 1, distance - 1, claimed);
+	ret |= floodClaim(table, island, x    , y - 1, distance - 1, claimed);
+	
+	return ret;
 }
 
 bool checkReachability(Table *table)
 {
 	bool change = false;
+	set<Island *> unsolvedIslands = table->unsolvedIslands;
 	
-	BOOST_FOREACH(Island *island, table->islands)
+	BOOST_FOREACH(Island *island, unsolvedIslands)
 	{
 		set<pair<int, int> > reachable;
 		set<pair<int, int> > unreachable;
+		set<pair<int, int> > claimed;
+		
+		change |= floodClaim(table, island, island->x, island->y, island->size, &claimed);
+		if (claimed.size() > island->size)
+			throw Unsolvable();
+		if (claimed.size() == island->size)
+			table->unsolvedIslands.erase(island);
+		
+		
 		for (unsigned i = 0; i < table->w; i++)
 		{
 			for(unsigned j = 0; j < table->h; j++)
@@ -370,14 +431,28 @@ bool checkReachability(Table *table)
 			}
 		}
 		
-		floodConquer(table, island, island->x, island->y, island->size, &reachable);
+		pair<int, int> coords;
+		
+		BOOST_FOREACH(coords, claimed)
+		{
+			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable);
+		}
 		if (reachable.size() < island->size)
 		{
-			cout << "island doesn't fit (" << island->x << "," << island->y << "," << island->size << ")" << endl;
+			//cout << "island doesn't fit (" << island->x << "," << island->y << "," << island->size << ")" << endl;
 			throw Unsolvable();
 		}
 		
-		pair<int, int> coords;
+		if (reachable.size() == island->size)
+		{
+			BOOST_FOREACH(coords, reachable)
+			{
+				Cell *cell = &table->cells[coords.first][coords.second];
+				claimCell(table, cell, island);
+			}
+			table->unsolvedIslands.erase(island);
+		}
+			
 		BOOST_FOREACH(coords, reachable)
 		{
 			unreachable.erase(coords);
@@ -421,13 +496,13 @@ beginning:
 	do
 	{
 		again = false;
-		cout << "checking black reachability" << endl;
+		//cout << "checking black reachability" << endl;
 		blackReachability(table);
-		cout << "drawing borders" << endl;
+		//cout << "drawing borders" << endl;
 		again |= drawBorders(table);
-		cout << "checking reachability" << endl;
+		//cout << "checking reachability" << endl;
 		again |= checkReachability(table);
-		cout << "checking black squares" << endl;
+		//cout << "checking black squares" << endl;
 		checkBlackSquares(table);
 	} while (again);
 	
@@ -435,74 +510,66 @@ beginning:
 		return;
 	
 	again = false;
-	for (unsigned i = 0; i < table->w - 1; i++)
+	
+	pair<int, int> coords;
+	BOOST_FOREACH(coords, table->greyCells)
 	{
-		for (unsigned j = 0; j < table->h - 1; j++)
+		int x = coords.first;
+		int y = coords.second;
+		
+		try
 		{
-			if (table->cells[i][j].state != Cell::S_GREY)
-				continue;
-			
-			try
-			{
-				Table alteration(*table);
-				cout << "assuming (" << i << "," << j << ") is white" << endl;
-				whitenCell(&alteration, &alteration.cells[i][j]);
-				solve(&alteration, depth - 1);
-			}
-			catch (Unsolvable)
-			{
-				cout << "nope, blackening (" << i << "," << j << ")" << endl;
-				blackenCell(table, &table->cells[i][j]);
-				goto beginning;
-			}
-			
-			cout << "meh" << endl;
-			
-			try
-			{
-				Table alteration(*table);
-				cout << "assuming (" << i << "," << j << ") is black" << endl;
-				blackenCell(&alteration, &alteration.cells[i][j]);
-				solve(&alteration, depth - 1);
-			}
-			catch (Unsolvable)
-			{
-				cout << "nope, whitening (" << i << "," << j << ")" << endl;
-				whitenCell(table, &table->cells[i][j]);
-				goto beginning;
-			}
-			
-			cout << "meh" << endl;
+			Table alteration(*table);
+			//cout << "assuming (" << i << "," << j << ") is white" << endl;
+			whitenCell(&alteration, &alteration.cells[x][y]);
+			solve(&alteration, depth - 1);
 		}
-	}
-}
-
-bool check(const Table &table)
-{
-	for (unsigned i = 0; i < table.w - 1; i++)
-	{
-		for (unsigned j = 0; j < table.h - 1; j++)
+		catch (Unsolvable)
 		{
-			if (table.cells[i][j].state == Cell::S_GREY)
-				return false;
+			//cout << "nope, blackening (" << i << "," << j << ")" << endl;
+			blackenCell(table, &table->cells[x][y]);
+			goto beginning;
 		}
+		
+		//cout << "meh" << endl;
+		
+		try
+		{
+			Table alteration(*table);
+			//cout << "assuming (" << i << "," << j << ") is black" << endl;
+			blackenCell(&alteration, &alteration.cells[x][y]);
+			solve(&alteration, depth - 1);
+		}
+		catch (Unsolvable)
+		{
+			//cout << "nope, whitening (" << i << "," << j << ")" << endl;
+			whitenCell(table, &table->cells[x][y]);
+			goto beginning;
+		}
+		
+		//cout << "meh" << endl;
 	}
-	return true;
 }
 
 int main(int argc, char *argv[])
 {
-	Table table = readTable("/home/vlad/nuri.txt");
-	cout << "table is " << table.w << " x " << table.h << endl;
-	int depth = 0;
-	while (!check(table))
+	if (argc != 2)
 	{
-		cout << "DEPTH " << depth << endl;
+		cout << "usage: nurikabe <file>" << endl;
+		return 1;
+	}
+	
+	Table table = readTable(argv[1]);
+	//cout << "table is " << table.w << " x " << table.h << endl;
+	int depth = 0;
+	while (table.greyCells.size() > 0)
+	{
+		//cout << "DEPTH " << depth << endl;
 		solve(&table, depth);
-		dumpTable(table);
+		//dumpTable(table);
 		depth++;
 	}
-	cout << "DONE" << endl;
+	//cout << "DONE" << endl;
 	dumpTable(table);
 	
 	return 0;
