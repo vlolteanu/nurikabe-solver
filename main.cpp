@@ -48,26 +48,39 @@ struct Table
 	
 	Cell cells[10][10];
 	list<Island *> islands;
+	
+	set<pair<int, int> > greyCells;
+	set<pair<int, int> > whiteCells;
+	set<pair<int, int> > blackCells;
+	
+	set<Island *> unsolvedIslands;
 };
 
 struct Unsolvable {};
 
-bool blackenCell(Cell *cell)
+bool blackenCell(Table *table, Cell *cell)
 {
 	cout << "blackening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_WHITE)
+	{
+		cout << "busted" << endl;
 		throw Unsolvable();
+	}
 	if (cell->state == Cell::S_BLACK)
 		return false;
 	
 	cell->possibleOwners.clear();
-	
 	cell->state = Cell::S_BLACK;
+	
+	table->greyCells.erase(pair<int, int>(cell->x, cell->y));
+	table->blackCells.insert(pair<int, int>(cell->x, cell->y));
+	
 	return true;
 }
 
-bool whitenCell(Cell *cell)
+bool whitenCell(Table *table, Cell *cell)
 {
+	cout << "whitening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
 		throw Unsolvable();
 	if (cell->state == Cell::S_WHITE)
@@ -76,17 +89,21 @@ bool whitenCell(Cell *cell)
 	if (cell->possibleOwners.empty())
 		throw Unsolvable();
 	
-	cell->state = Cell::S_BLACK;
+	cell->state = Cell::S_WHITE;
+	
+	table->greyCells.erase(pair<int, int>(cell->x, cell->y));
+	table->whiteCells.insert(pair<int, int>(cell->x, cell->y));
+	
 	return true;
 }
 
-bool declareUnreachable(Cell *cell, Island *island)
+bool declareUnreachable(Table *table, Cell *cell, Island *island)
 {
 	bool found = cell->possibleOwners.erase(island) > 0;
 	if (cell->possibleOwners.empty())
 	{
 		cout << "no owners" << endl;
-		blackenCell(cell);
+		blackenCell(table, cell);
 	}
 	return found;
 }
@@ -120,10 +137,15 @@ Table readTable(string filename)
 				
 				cell->state = Cell::S_WHITE;
 				cell->possibleOwners.insert(island);
+				
+				table.unsolvedIslands.insert(island);
+				table.whiteCells.insert(pair<int, int>(i, lines));
 			}
 			else if (line [i] == '.')
 			{
 				cell->state = Cell::S_GREY;
+				
+				table.greyCells.insert(pair<int, int>(i, lines));
 			}
 			else
 			{
@@ -261,12 +283,12 @@ bool drawBorders(Table *table)
 				if (done)
 					break;
 				
-				if (neighbours[k]->state == Cell::S_BLACK)
+				if (neighbours[k]->state != Cell::S_WHITE)
 					continue;
 				
 				for (int l = 1; l < neighCount; l++)
 				{
-					if (neighbours[l]->state == Cell::S_BLACK)
+					if (neighbours[l]->state != Cell::S_WHITE)
 						continue;
 					
 					bool intersect = false;
@@ -287,7 +309,7 @@ bool drawBorders(Table *table)
 							"(" << neighbours[k]->x << "," << neighbours[k]->y << ") "<<
 							"(" << neighbours[l]->x << "," << neighbours[l]->y << ") "<<
 							endl;
-						blackenCell(cell);
+						blackenCell(table, cell);
 						done = true;
 						break;
 					}
@@ -301,17 +323,26 @@ bool drawBorders(Table *table)
 
 void floodConquer(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
 {
+	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") conquer " << x << "," << y << " ";
 	if (distance == 0)
+	{
+		//cout << "too far" << endl;
 		return;
+	}
 	
 	if (x < 0 || x >= (int)table->w || y < 0 || y >= (int)table->h)
+	{
+		//cout << "oo bounds" << endl;
 		return;
+	}
 	
 	if (table->cells[x][y].possibleOwners.find(island) == table->cells[x][y].possibleOwners.end())
+	{
+		//cout << "not ownable" << endl;
 		return;
+	}
 	
-	if (reachable->find(pair<int, int>(x, y)) != reachable->end())
-		return;
+	//cout << "conquered" << endl;
 	
 	reachable->insert(pair<int, int>(x, y));
 	
@@ -342,8 +373,7 @@ bool checkReachability(Table *table)
 		floodConquer(table, island, island->x, island->y, island->size, &reachable);
 		if (reachable.size() < island->size)
 		{
-			cout << "island doesn't fit" << endl;
-			dumpTable(*table);
+			cout << "island doesn't fit (" << island->x << "," << island->y << "," << island->size << ")" << endl;
 			throw Unsolvable();
 		}
 		
@@ -354,41 +384,125 @@ bool checkReachability(Table *table)
 		}
 		BOOST_FOREACH(coords, unreachable)
 		{
-			change |= declareUnreachable(&table->cells[coords.first][coords.second], island);
+			change |= declareUnreachable(table, &table->cells[coords.first][coords.second], island);
 		}
 	}
 	
 	return change;
 }
 
-void check(Table *table)
+void checkBlackSquare(Table *table, unsigned x, unsigned y)
 {
-	map<Island *, set<Cell *> > reachableCells;
-	map<Island *, set<Cell *> > ownedCells;
-	BOOST_FOREACH(Island *island, table->islands)
+	for (unsigned i = 0; i < 2; i++)
 	{
-		reachableCells[island] = set<Cell *>();
-		ownedCells[island] = set<Cell *>();
+		for (unsigned j = 0; j < 2; j++)
+		{
+			if (table->cells[x + i][y + j].state != Cell::S_BLACK)
+				return;
+		}
 	}
+	throw Unsolvable();
+}
+
+void checkBlackSquares(Table *table)
+{
+	for (unsigned i = 0; i < table->w - 1; i++)
+	{
+		for (unsigned j = 0; j < table->h - 1; j++)
+			checkBlackSquare(table, i, j);
+	}
+}
+
+void solve(Table *table, int depth)
+{	
+beginning:
 	
 	bool again;
 	do
 	{
 		again = false;
+		cout << "checking black reachability" << endl;
 		blackReachability(table);
 		cout << "drawing borders" << endl;
 		again |= drawBorders(table);
 		cout << "checking reachability" << endl;
 		again |= checkReachability(table);
-		dumpTable(*table);
-	} while (again);	
+		cout << "checking black squares" << endl;
+		checkBlackSquares(table);
+	} while (again);
+	
+	if (depth == 0)
+		return;
+	
+	again = false;
+	for (unsigned i = 0; i < table->w - 1; i++)
+	{
+		for (unsigned j = 0; j < table->h - 1; j++)
+		{
+			if (table->cells[i][j].state != Cell::S_GREY)
+				continue;
+			
+			try
+			{
+				Table alteration(*table);
+				cout << "assuming (" << i << "," << j << ") is white" << endl;
+				whitenCell(&alteration, &alteration.cells[i][j]);
+				solve(&alteration, depth - 1);
+			}
+			catch (Unsolvable)
+			{
+				cout << "nope, blackening (" << i << "," << j << ")" << endl;
+				blackenCell(table, &table->cells[i][j]);
+				goto beginning;
+			}
+			
+			cout << "meh" << endl;
+			
+			try
+			{
+				Table alteration(*table);
+				cout << "assuming (" << i << "," << j << ") is black" << endl;
+				blackenCell(&alteration, &alteration.cells[i][j]);
+				solve(&alteration, depth - 1);
+			}
+			catch (Unsolvable)
+			{
+				cout << "nope, whitening (" << i << "," << j << ")" << endl;
+				whitenCell(table, &table->cells[i][j]);
+				goto beginning;
+			}
+			
+			cout << "meh" << endl;
+		}
+	}
+}
+
+bool check(const Table &table)
+{
+	for (unsigned i = 0; i < table.w - 1; i++)
+	{
+		for (unsigned j = 0; j < table.h - 1; j++)
+		{
+			if (table.cells[i][j].state == Cell::S_GREY)
+				return false;
+		}
+	}
+	return true;
 }
 
 int main(int argc, char *argv[])
 {
 	Table table = readTable("/home/vlad/nuri.txt");
 	cout << "table is " << table.w << " x " << table.h << endl;
-	check(&table);
+	int depth = 0;
+	while (!check(table))
+	{
+		cout << "DEPTH " << depth << endl;
+		solve(&table, depth);
+		dumpTable(table);
+		depth++;
+	}
+	cout << "DONE" << endl;
 	dumpTable(table);
 	
 	return 0;
