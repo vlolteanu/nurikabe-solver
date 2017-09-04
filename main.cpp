@@ -115,6 +115,17 @@ bool whitenCell(Table *table, Cell *cell)
 	table->greyCells.erase(pair<int, int>(cell->x, cell->y));
 	table->whiteCells.insert(pair<int, int>(cell->x, cell->y));
 	
+	BOOST_FOREACH(Cell *neighbour, getNeighbours(table, cell))
+	{
+		set<Island *> neighbourOwners = neighbour->possibleOwners;
+		
+		BOOST_FOREACH(Island *island, neighbourOwners)
+		{
+			if (cell->possibleOwners.find(island) == cell->possibleOwners.end())
+				declareUnreachable(table, neighbour, island);
+		}
+	}
+	
 	return true;
 }
 
@@ -137,13 +148,20 @@ bool claimCell(Table *table, Cell *cell, Island *owner)
 
 bool declareUnreachable(Table *table, Cell *cell, Island *island)
 {
-	bool found = cell->possibleOwners.erase(island) > 0;
+	bool ret = cell->possibleOwners.erase(island) > 0;
 	if (cell->possibleOwners.empty())
 	{
 		//cout << "no owners" << endl;
 		blackenCell(table, cell);
 	}
-	return found;
+	if (cell->state == Cell::S_WHITE && ret)
+	{
+		BOOST_FOREACH(Cell *neighbour, getNeighbours(table, cell))
+		{
+			ret |= declareUnreachable(table, neighbour, island);
+		}
+	}
+	return ret;
 }
 
 Table readTable(string filename)
@@ -494,8 +512,6 @@ void sanity(Table *table)
 		again = false;
 		//cout << "checking black reachability" << endl;
 		blackReachability(table);
-		//cout << "drawing borders" << endl;
-		again |= drawBorders(table);
 		//cout << "checking reachability" << endl;
 		again |= checkReachability(table);
 		//cout << "checking black squares" << endl;
