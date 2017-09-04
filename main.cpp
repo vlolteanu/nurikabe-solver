@@ -40,6 +40,7 @@ struct Cell
 	unsigned x;
 	unsigned y;
 	set<Island *> possibleOwners;
+	bool claimed;
 };
 
 struct Table
@@ -184,6 +185,7 @@ Table readTable(string filename)
 			cell->x = i;
 			cell->y = lines;
 			cell->state = Cell::S_GREY;
+			cell->claimed = false;
 			table.greyCells.insert(pair<int, int>(i, lines));
 			
 			if (line[i] > '0'  && line[i] <= '9')
@@ -296,7 +298,7 @@ void blackReachability(const Table *table)
 		throw Unsolvable();
 }
 
-void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable)
+void floodExplore(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *reachable, set<pair<int, int> > *satellites)
 {
 	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") explore " << x << "," << y << " ";
 	if (distance == 0)
@@ -322,11 +324,13 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 	//cout << "conquered" << endl;
 	
 	reachable->insert(pair<int, int>(x, y));
+	if (cell->state == Cell::S_WHITE && !cell->claimed && cell->possibleOwners.size() == 1)
+		satellites->insert(pair<int, int>(x, y));
 	
-	floodExplore(table, island, x + 1, y    , distance - 1, reachable);
-	floodExplore(table, island, x - 1, y    , distance - 1, reachable);
-	floodExplore(table, island, x    , y + 1, distance - 1, reachable);
-	floodExplore(table, island, x    , y - 1, distance - 1, reachable);
+	floodExplore(table, island, x + 1, y    , distance - 1, reachable, satellites);
+	floodExplore(table, island, x - 1, y    , distance - 1, reachable, satellites);
+	floodExplore(table, island, x    , y + 1, distance - 1, reachable, satellites);
+	floodExplore(table, island, x    , y - 1, distance - 1, reachable, satellites);
 }
 
 bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
@@ -352,6 +356,7 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	ret |= declareOwner(table, &table->cells[x][y], island);
 	
 	claimed->insert(pair<int, int>(x, y));
+	table->cells[x][y].claimed = true;
 	
 	ret |= floodClaim(table, island, x + 1, y    , distance - 1, claimed);
 	ret |= floodClaim(table, island, x - 1, y    , distance - 1, claimed);
@@ -371,6 +376,7 @@ bool checkReachability(Table *table)
 		set<pair<int, int> > reachable;
 		set<pair<int, int> > unreachable;
 		set<pair<int, int> > claimed;
+		set<pair<int, int> > satellites;
 		
 		change |= floodClaim(table, island, island->x, island->y, island->size, &claimed);
 		if (claimed.size() > island->size)
@@ -393,7 +399,7 @@ bool checkReachability(Table *table)
 		
 		BOOST_FOREACH(coords, claimed)
 		{
-			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable);
+			floodExplore(table, island, coords.first, coords.second, island->size - claimed.size() + 1, &reachable, &satellites);
 		}
 		if (reachable.size() < island->size)
 		{
