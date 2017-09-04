@@ -125,12 +125,12 @@ bool claimCell(Table *table, Cell *cell, Island *owner)
 	//cout << "claiming " << cell->x << " " << cell->y << endl;
 	ret = whitenCell(table, cell);
 	
-	if (cell->possibleOwners.find(owner) == cell->possibleOwners.end())
-		throw Unsolvable();
-	
-	ret = cell->possibleOwners.size() > 1;
-	cell->possibleOwners.clear();
-	cell->possibleOwners.insert(owner);
+	set<Island *> possibleOwners = cell->possibleOwners;
+	BOOST_FOREACH(Island *island, possibleOwners)
+	{
+		if (island != owner)
+			cell->possibleOwners.erase(island);
+	}
 	
 	return ret;
 }
