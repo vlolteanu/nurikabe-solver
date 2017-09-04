@@ -223,7 +223,7 @@ void dumpTable(const Table &table)
 			Cell::State state = table.cells[i][j].state;
 			if (state == Cell::S_BLACK)
 			{
-				cout << "*";
+				cout << "#";
 			}
 			else if (state == Cell::S_GREY)
 			{
@@ -559,6 +559,8 @@ beginning:
 	}
 }
 
+static const int MAX_DEPTH = 2;
+
 int main(int argc, char *argv[])
 {
 	if (argc != 2)
@@ -576,11 +578,17 @@ int main(int argc, char *argv[])
 		solve(&table, depth);
 		//dumpTable(table);
 		depth++;
+		
+		if (depth > MAX_DEPTH)
+		{
+			cerr << "Max depth reached" << endl;
+			return 1;
+		}
 	}
 	//cout << "DONE" << endl;
 	dumpTable(table);
 	
-	cerr << "Max depth: " << (depth - 1) << endl;
+	cerr << "Depth: " << (depth - 1) << endl;
 	
 	return 0;
 }
