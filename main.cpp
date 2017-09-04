@@ -352,7 +352,6 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	if (table->cells[x][y].state != Cell::S_WHITE)
 		return false;
 	
-	ret |= whitenCell(table, &table->cells[x][y]);
 	ret |= declareOwner(table, &table->cells[x][y], island);
 	
 	claimed->insert(pair<int, int>(x, y));
