@@ -26,6 +26,11 @@ struct Island
 		: x(x), y(y), size(size) {}
 };
 
+struct IslandData
+{
+	
+};
+
 struct Cell
 {
 	enum State
@@ -55,6 +60,7 @@ struct Table
 	set<pair<int, int> > blackCells;
 	
 	set<Island *> unsolvedIslands;
+	map<Island *, IslandData> islandData;
 };
 
 struct Unsolvable {};
@@ -509,6 +515,7 @@ Table readTable(string filename)
 	
 	BOOST_FOREACH(Island *island, table.islands)
 	{
+		table.islandData[island] = IslandData();
 		whitenCell(&table, &table.cells[island->x][island->y]);
 		declareOwner(&table, &table.cells[island->x][island->y], island);
 	}
