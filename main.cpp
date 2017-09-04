@@ -58,6 +58,24 @@ struct Table
 
 struct Unsolvable {};
 
+vector<Cell *> getNeighbours(Table *table, Cell *cell)
+{
+	vector<Cell *> ret;
+	int x = cell->x;
+	int y = cell->y;
+	
+	if (x - 1 >= 0)
+		ret.push_back(&table->cells[x-1][y]);
+	if (x + 1 < (int)table->w)
+		ret.push_back(&table->cells[x+1][y]);
+	if (y - 1 >= 0)
+		ret.push_back(&table->cells[x][y-1]);
+	if (y + 1 < (int)table->h)
+		ret.push_back(&table->cells[x][y+1]);
+	
+	return ret;
+}
+
 bool blackenCell(Table *table, Cell *cell)
 {
 	if (cell->state == Cell::S_WHITE)
@@ -280,19 +298,9 @@ bool drawBorders(Table *table)
 			
 			bool done = false;
 			
-			Cell *neighbours[4] = { NULL };
-			int neighCount = 0;
+			vector<Cell *>neighbours = getNeighbours(table, cell);
 			
-			if ((int)i - 1 >= 0)
-				neighbours[neighCount++] = &table->cells[i-1][j];
-			if (i + 1 < table->w)
-				neighbours[neighCount++] = &table->cells[i+1][j];
-			if ((int)j - 1 >= 0)
-				neighbours[neighCount++] = &table->cells[i][j-1];
-			if (j + 1 < table->h)
-				neighbours[neighCount++] = &table->cells[i][j+1];
-			
-			for (int k = 0; k < neighCount - 1; k++)
+			for (int k = 0; k < (int)neighbours.size() - 1; k++)
 			{
 				if (done)
 					break;
@@ -300,7 +308,7 @@ bool drawBorders(Table *table)
 				if (neighbours[k]->state != Cell::S_WHITE)
 					continue;
 				
-				for (int l = 1; l < neighCount; l++)
+				for (int l = 1; l < (int)neighbours.size(); l++)
 				{
 					if (neighbours[l]->state != Cell::S_WHITE)
 						continue;
