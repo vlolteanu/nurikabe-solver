@@ -153,21 +153,27 @@ bool declareOwner(Table *table, Cell *cell, Island *owner)
 
 bool declareUnreachable(Table *table, Cell *cell, Island *island)
 {
-	bool ret = cell->possibleOwners.erase(island) > 0;
+	set<Island *>::iterator it = cell->possibleOwners.find(island);
+	if (it == cell->possibleOwners.end())
+		return false;
+	
+	cell->possibleOwners.erase(it);
+	if (table->dirtyIslands.insert(island).second);
+		//cout << "dirty" << endl;
+	
 	if (cell->possibleOwners.empty())
 	{
 		//cout << "no owners" << endl;
 		blackenCell(table, cell);
 	}
-	if (cell->state == Cell::S_WHITE && ret)
+	if (cell->state == Cell::S_WHITE)
 	{
 		BOOST_FOREACH(Cell *neighbour, getNeighbours(table, cell))
 		{
-			ret |= declareUnreachable(table, neighbour, island);
+			declareUnreachable(table, neighbour, island);
 		}
 	}
-	table->dirtyIslands.insert(island);
-	return ret;
+	return true;
 }
 
 void floodBlackReachability(const Table *table, set<pair<int, int> > *blacks, set<pair<int, int> > *visited, const pair<int, int> &start)
@@ -333,6 +339,7 @@ void checkReachability(Table *table)
 		}
 		
 		table->dirtyIslands.erase(island);
+		//cout << "clean" << endl;
 		
 		BOOST_FOREACH(coords, satellites)
 		{
