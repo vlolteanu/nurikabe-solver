@@ -59,8 +59,8 @@ struct Table
 	set<pair<int, int> > whiteCells;
 	set<pair<int, int> > blackCells;
 	
-	set<Island *> unsolvedIslands;
 	map<Island *, IslandData> islandData;
+	set<Island *> dirtyIslands;
 };
 
 struct Unsolvable {};
@@ -166,6 +166,7 @@ bool declareUnreachable(Table *table, Cell *cell, Island *island)
 			ret |= declareUnreachable(table, neighbour, island);
 		}
 	}
+	table->dirtyIslands.insert(island);
 	return ret;
 }
 
@@ -276,24 +277,20 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	return ret;
 }
 
-bool checkReachability(Table *table)
+void checkReachability(Table *table)
 {
-	bool change = false;
-	set<Island *> unsolvedIslands = table->unsolvedIslands;
-	
-	BOOST_FOREACH(Island *island, unsolvedIslands)
+	while (!table->dirtyIslands.empty())
 	{
+		Island *island = *(table->dirtyIslands.begin());
+		
 		set<pair<int, int> > reachable;
 		set<pair<int, int> > unreachable;
 		set<pair<int, int> > claimed;
 		set<pair<int, int> > satellites;
 		
-		change |= floodClaim(table, island, island->x, island->y, island->size, &claimed);
+		floodClaim(table, island, island->x, island->y, island->size, &claimed);
 		if (claimed.size() > island->size)
 			throw Unsolvable();
-		if (claimed.size() == island->size)
-			table->unsolvedIslands.erase(island);
-		
 		
 		for (unsigned i = 0; i < table->w; i++)
 		{
@@ -323,9 +320,7 @@ bool checkReachability(Table *table)
 			{
 				Cell *cell = &table->cells[coords.first][coords.second];
 				whitenCell(table, cell);
-				declareOwner(table, cell, island);
 			}
-			table->unsolvedIslands.erase(island);
 		}
 			
 		BOOST_FOREACH(coords, reachable)
@@ -334,8 +329,10 @@ bool checkReachability(Table *table)
 		}
 		BOOST_FOREACH(coords, unreachable)
 		{
-			change |= declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+			declareUnreachable(table, &table->cells[coords.first][coords.second], island);
 		}
+		
+		table->dirtyIslands.erase(island);
 		
 		BOOST_FOREACH(coords, satellites)
 		{
@@ -350,12 +347,10 @@ bool checkReachability(Table *table)
 			}
 			BOOST_FOREACH(coords, backwardsUnreachable)
 			{
-				change |= declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+				declareUnreachable(table, &table->cells[coords.first][coords.second], island);
 			}
 		}
 	}
-	
-	return change;
 }
 
 void checkBlackSquare(Table *table, unsigned x, unsigned y)
@@ -383,17 +378,15 @@ void checkBlackSquares(Table *table)
 
 void sanity(Table *table)
 {
-	bool again;
-	do
+	while (!table->dirtyIslands.empty())
 	{
-		again = false;
+		//cout << "checking reachability" << endl;
+		checkReachability(table);
 		//cout << "checking black reachability" << endl;
 		blackReachability(table);
-		//cout << "checking reachability" << endl;
-		again |= checkReachability(table);
 		//cout << "checking black squares" << endl;
 		checkBlackSquares(table);
-	} while (again);
+	}
 }
 
 bool solve(Table *table, int maxDepth)
@@ -492,7 +485,6 @@ Table readTable(string filename)
 				Island *island = new Island(i, lines, line[i] - '0');
 				
 				table.islands.push_back(island);
-				table.unsolvedIslands.insert(island);
 			}
 			else if (line [i] == '.')
 			{
