@@ -472,7 +472,9 @@ deeper:
 		catch (Unsolvable)
 		{
 			//cout << "nope, whitening (" << i << "," << j << ")" << endl;
-			whitenCell(table, &table->cells[x][y], removals);
+			//whitenCell(table, &table->cells[x][y], removals);
+			*table = whiteAlteration;
+			removals->insert(whiteRemovals.begin(), whiteRemovals.end());
 			goto beginning;
 		}
 		
