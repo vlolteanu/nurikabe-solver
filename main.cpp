@@ -114,7 +114,7 @@ bool blackenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > 
 	return true;
 }
 
-bool whitenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > *removals)
+bool whitenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > *removals, set<pair<int, int> > *whitenings)
 {
 	//cout << "whitening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
@@ -127,6 +127,7 @@ bool whitenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > *
 	
 	cell->state = Cell::S_WHITE;
 	table->colorChange = true;
+	whitenings->insert(pair<int, int>(cell->x, cell->y));
 	
 	table->dirtyIslands.insert(cell->possibleOwners.begin(), cell->possibleOwners.end());
 	
@@ -295,7 +296,7 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	return ret;
 }
 
-void checkReachability(Table *table, set<pair<pair<int, int>, Island *> > *removals)
+void checkReachability(Table *table, set<pair<pair<int, int>, Island *> > *removals, set<pair<int, int> > *whitenings)
 {
 	while (!table->dirtyIslands.empty())
 	{
@@ -337,7 +338,7 @@ void checkReachability(Table *table, set<pair<pair<int, int>, Island *> > *remov
 			BOOST_FOREACH(coords, reachable)
 			{
 				Cell *cell = &table->cells[coords.first][coords.second];
-				whitenCell(table, cell, removals);
+				whitenCell(table, cell, removals, whitenings);
 			}
 		}
 			
@@ -394,12 +395,12 @@ void checkBlackSquares(Table *table)
 	}
 }
 
-void sanity(Table *table, set<pair<pair<int, int>, Island *> > *removals)
+void sanity(Table *table, set<pair<pair<int, int>, Island *> > *removals, set<pair<int, int> > *whitenings)
 {
 	while (!table->dirtyIslands.empty())
 	{
 		//cout << "checking reachability" << endl;
-		checkReachability(table, removals);
+		checkReachability(table, removals, whitenings);
 		//cout << "checking black reachability" << endl;
 		if (table->colorChange)
 		{
@@ -412,12 +413,12 @@ void sanity(Table *table, set<pair<pair<int, int>, Island *> > *removals)
 	}
 }
 
-bool solve(Table *table, int maxDepth, set<pair<pair<int, int>, Island *> > *removals)
+bool solve(Table *table, int maxDepth, set<pair<pair<int, int>, Island *> > *removals, set<pair<int, int> > *whitenings)
 {
 	int depth;
 beginning:
 	
-	sanity(table, removals);
+	sanity(table, removals, whitenings);
 	
 	if (table->greyCells.empty())
 		return true;
@@ -437,12 +438,13 @@ deeper:
 		
 		Table whiteAlteration(*table);
 		set<pair<pair<int, int>, Island *> > whiteRemovals;
+		set<pair<int, int> > whiteWhitenings;
 		try
 		{
 			
 			//cout << "assuming (" << i << "," << j << ") is white" << endl;
-			whitenCell(&whiteAlteration, &whiteAlteration.cells[x][y], &whiteRemovals);
-			if (solve(&whiteAlteration, depth - 1, &whiteRemovals))
+			whitenCell(&whiteAlteration, &whiteAlteration.cells[x][y], &whiteRemovals, &whiteWhitenings);
+			if (solve(&whiteAlteration, depth - 1, &whiteRemovals, &whiteWhitenings))
 			{
 				*table = whiteAlteration;
 				return true;
@@ -459,11 +461,12 @@ deeper:
 		
 		Table blackAlteration(*table);
 		set<pair<pair<int, int>, Island *> > blackRemovals;
+		set<pair<int, int> > blackWhitenings;
 		try
 		{
 			//cout << "assuming (" << i << "," << j << ") is black" << endl;
 			blackenCell(&blackAlteration, &blackAlteration.cells[x][y], &blackRemovals);
-			if (solve(&blackAlteration, depth - 1, &blackRemovals))
+			if (solve(&blackAlteration, depth - 1, &blackRemovals, &blackWhitenings))
 			{
 				*table = blackAlteration;
 				return true;
@@ -475,6 +478,7 @@ deeper:
 			//whitenCell(table, &table->cells[x][y], removals);
 			*table = whiteAlteration;
 			removals->insert(whiteRemovals.begin(), whiteRemovals.end());
+			whitenings->insert(whiteWhitenings.begin(), whiteWhitenings.end());
 			goto beginning;
 		}
 		
@@ -489,6 +493,15 @@ deeper:
 			}
 		}
 		
+		pair<int, int> whitening;
+		BOOST_FOREACH(whitening, whiteWhitenings)
+		{
+			if (blackWhitenings.find(whitening) != blackWhitenings.end())
+			{
+				agree = true;
+				whitenCell(table, &table->cells[whitening.first][whitening.second], removals, whitenings);
+			}
+		}
 		if (agree)
 			goto beginning;
 		
@@ -530,7 +543,7 @@ deeper:
 	goto deeper;
 }
 
-Table readTable(string filename, set<pair<pair<int, int>, Island *> > *removals)
+Table readTable(string filename, set<pair<pair<int, int>, Island *> > *removals, set<pair<int, int> > *whitenings)
 {
 	ifstream infile(filename.c_str());
 	string line;
@@ -582,7 +595,7 @@ Table readTable(string filename, set<pair<pair<int, int>, Island *> > *removals)
 	BOOST_FOREACH(Island *island, table.islands)
 	{
 		table.islandData[island] = IslandData();
-		whitenCell(&table, &table.cells[island->x][island->y], removals);
+		whitenCell(&table, &table.cells[island->x][island->y], removals, whitenings);
 		declareOwner(&table, &table.cells[island->x][island->y], island, removals);
 	}
 	
@@ -633,10 +646,11 @@ int main(int argc, char *argv[])
 	}
 	
 	set<pair<pair<int, int>, Island *> > removals;
-	Table table = readTable(argv[1], &removals);
+	set<pair<int, int> > whitenings;
+	Table table = readTable(argv[1], &removals, &whitenings);
 	//cout << "table is " << table.w << " x " << table.h << endl;
 	//dumpTable(table);
-	if (!solve(&table, table.w * table.h, &removals))
+	if (!solve(&table, table.w * table.h, &removals, &whitenings))
 		throw Unsolvable();
 	//dumpTable(table);
 	//cout << "DONE" << endl;
