@@ -62,13 +62,12 @@ struct Table
 	map<Island *, IslandData> islandData;
 	set<Island *> dirtyIslands;
 	
-	set<pair<pair<int, int>, Island *> > removals;
 	bool colorChange;
 };
 
 struct Unsolvable {};
 
-bool declareUnreachable(Table *table, Cell *cell, Island *island);
+bool declareUnreachable(Table *table, Cell *cell, Island *island, set<pair<pair<int, int>, Island *> > *removals);
 
 vector<Cell *> getNeighbours(Table *table, Cell *cell)
 {
@@ -88,7 +87,7 @@ vector<Cell *> getNeighbours(Table *table, Cell *cell)
 	return ret;
 }
 
-bool blackenCell(Table *table, Cell *cell)
+bool blackenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > *removals)
 {
 	//cout << "blackening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_WHITE)
@@ -102,7 +101,7 @@ bool blackenCell(Table *table, Cell *cell)
 	BOOST_FOREACH(Island *island, cell->possibleOwners)
 	{
 		table->dirtyIslands.insert(island);
-		table->removals.insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), island));
+		removals->insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), island));
 	}
 	
 	cell->possibleOwners.clear();
@@ -115,7 +114,7 @@ bool blackenCell(Table *table, Cell *cell)
 	return true;
 }
 
-bool whitenCell(Table *table, Cell *cell)
+bool whitenCell(Table *table, Cell *cell, set<pair<pair<int, int>, Island *> > *removals)
 {
 	//cout << "whitening " << cell->x << " " << cell->y << endl;
 	if (cell->state == Cell::S_BLACK)
@@ -141,14 +140,14 @@ bool whitenCell(Table *table, Cell *cell)
 		BOOST_FOREACH(Island *island, neighbourOwners)
 		{
 			if (cell->possibleOwners.find(island) == cell->possibleOwners.end())
-				declareUnreachable(table, neighbour, island);
+				declareUnreachable(table, neighbour, island, removals);
 		}
 	}
 	
 	return true;
 }
 
-bool declareOwner(Table *table, Cell *cell, Island *owner)
+bool declareOwner(Table *table, Cell *cell, Island *owner, set<pair<pair<int, int>, Island *> > *removals)
 {
 	bool ret = false;
 	
@@ -158,32 +157,32 @@ bool declareOwner(Table *table, Cell *cell, Island *owner)
 	BOOST_FOREACH(Island *island, possibleOwners)
 	{
 		if (island != owner)
-			ret |= declareUnreachable(table, cell, island);
+			ret |= declareUnreachable(table, cell, island, removals);
 	}
 	
 	return ret;
 }
 
-bool declareUnreachable(Table *table, Cell *cell, Island *island)
+bool declareUnreachable(Table *table, Cell *cell, Island *island, set<pair<pair<int, int>, Island *> > *removals)
 {
 	set<Island *>::iterator it = cell->possibleOwners.find(island);
 	if (it == cell->possibleOwners.end())
 		return false;
 	
-	table->removals.insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), *it));
+	removals->insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), *it));
 	cell->possibleOwners.erase(it);
 	table->dirtyIslands.insert(island).second;
 	
 	if (cell->possibleOwners.empty())
 	{
 		//cout << "no owners" << endl;
-		blackenCell(table, cell);
+		blackenCell(table, cell, removals);
 	}
 	if (cell->state == Cell::S_WHITE)
 	{
 		BOOST_FOREACH(Cell *neighbour, getNeighbours(table, cell))
 		{
-			declareUnreachable(table, neighbour, island);
+			declareUnreachable(table, neighbour, island, removals);
 		}
 	}
 	return true;
@@ -264,7 +263,7 @@ void floodExplore(Table *table, Island *island, int x, int y, int distance, set<
 	floodExplore(table, island, x    , y - 1, distance - 1, reachable, satellites);
 }
 
-bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed)
+bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pair<int, int> > *claimed, set<pair<pair<int, int>, Island *> > *removals)
 {
 	bool ret = false;
 	//cout << "island (" << island->x << "x" << island->y << "x" << distance << ") claim " << x << "," << y << " ";
@@ -283,20 +282,20 @@ bool floodClaim(Table *table, Island *island, int x, int y, int distance, set<pa
 	if (table->cells[x][y].state != Cell::S_WHITE)
 		return false;
 	
-	ret |= declareOwner(table, &table->cells[x][y], island);
+	ret |= declareOwner(table, &table->cells[x][y], island, removals);
 	
 	claimed->insert(pair<int, int>(x, y));
 	table->cells[x][y].claimed = true;
 	
-	ret |= floodClaim(table, island, x + 1, y    , distance - 1, claimed);
-	ret |= floodClaim(table, island, x - 1, y    , distance - 1, claimed);
-	ret |= floodClaim(table, island, x    , y + 1, distance - 1, claimed);
-	ret |= floodClaim(table, island, x    , y - 1, distance - 1, claimed);
+	ret |= floodClaim(table, island, x + 1, y    , distance - 1, claimed, removals);
+	ret |= floodClaim(table, island, x - 1, y    , distance - 1, claimed, removals);
+	ret |= floodClaim(table, island, x    , y + 1, distance - 1, claimed, removals);
+	ret |= floodClaim(table, island, x    , y - 1, distance - 1, claimed, removals);
 	
 	return ret;
 }
 
-void checkReachability(Table *table)
+void checkReachability(Table *table, set<pair<pair<int, int>, Island *> > *removals)
 {
 	while (!table->dirtyIslands.empty())
 	{
@@ -307,7 +306,7 @@ void checkReachability(Table *table)
 		set<pair<int, int> > claimed;
 		set<pair<int, int> > satellites;
 		
-		floodClaim(table, island, island->x, island->y, island->size, &claimed);
+		floodClaim(table, island, island->x, island->y, island->size, &claimed, removals);
 		if (claimed.size() > island->size)
 			throw Unsolvable();
 		
@@ -338,7 +337,7 @@ void checkReachability(Table *table)
 			BOOST_FOREACH(coords, reachable)
 			{
 				Cell *cell = &table->cells[coords.first][coords.second];
-				whitenCell(table, cell);
+				whitenCell(table, cell, removals);
 			}
 		}
 			
@@ -348,7 +347,7 @@ void checkReachability(Table *table)
 		}
 		BOOST_FOREACH(coords, unreachable)
 		{
-			declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+			declareUnreachable(table, &table->cells[coords.first][coords.second], island, removals);
 		}
 		
 		table->dirtyIslands.erase(island);
@@ -366,7 +365,7 @@ void checkReachability(Table *table)
 			}
 			BOOST_FOREACH(coords, backwardsUnreachable)
 			{
-				declareUnreachable(table, &table->cells[coords.first][coords.second], island);
+				declareUnreachable(table, &table->cells[coords.first][coords.second], island, removals);
 			}
 		}
 	}
@@ -395,12 +394,12 @@ void checkBlackSquares(Table *table)
 	}
 }
 
-void sanity(Table *table)
+void sanity(Table *table, set<pair<pair<int, int>, Island *> > *removals)
 {
 	while (!table->dirtyIslands.empty())
 	{
 		//cout << "checking reachability" << endl;
-		checkReachability(table);
+		checkReachability(table, removals);
 		//cout << "checking black reachability" << endl;
 		if (table->colorChange)
 		{
@@ -413,12 +412,12 @@ void sanity(Table *table)
 	}
 }
 
-bool solve(Table *table, int maxDepth)
+bool solve(Table *table, int maxDepth, set<pair<pair<int, int>, Island *> > *removals)
 {
 	int depth;
 beginning:
 	
-	sanity(table);
+	sanity(table, removals);
 	
 	if (table->greyCells.empty())
 		return true;
@@ -437,13 +436,13 @@ deeper:
 		int y = coords.second;
 		
 		Table whiteAlteration(*table);
-		whiteAlteration.removals.clear();
+		set<pair<pair<int, int>, Island *> > whiteRemovals;
 		try
 		{
 			
 			//cout << "assuming (" << i << "," << j << ") is white" << endl;
-			whitenCell(&whiteAlteration, &whiteAlteration.cells[x][y]);
-			if (solve(&whiteAlteration, depth - 1))
+			whitenCell(&whiteAlteration, &whiteAlteration.cells[x][y], &whiteRemovals);
+			if (solve(&whiteAlteration, depth - 1, &whiteRemovals))
 			{
 				*table = whiteAlteration;
 				return true;
@@ -452,19 +451,19 @@ deeper:
 		catch (Unsolvable)
 		{
 			//cout << "nope, blackening (" << i << "," << j << ")" << endl;
-			blackenCell(table, &table->cells[x][y]);
+			blackenCell(table, &table->cells[x][y], removals);
 			goto beginning;
 		}
 		
 		//cout << "meh" << endl;
 		
 		Table blackAlteration(*table);
-		blackAlteration.removals.clear();
+		set<pair<pair<int, int>, Island *> > blackRemovals;
 		try
 		{
 			//cout << "assuming (" << i << "," << j << ") is black" << endl;
-			blackenCell(&blackAlteration, &blackAlteration.cells[x][y]);
-			if (solve(&blackAlteration, depth - 1))
+			blackenCell(&blackAlteration, &blackAlteration.cells[x][y], &blackRemovals);
+			if (solve(&blackAlteration, depth - 1, &blackRemovals))
 			{
 				*table = blackAlteration;
 				return true;
@@ -473,18 +472,18 @@ deeper:
 		catch (Unsolvable)
 		{
 			//cout << "nope, whitening (" << i << "," << j << ")" << endl;
-			whitenCell(table, &table->cells[x][y]);
+			whitenCell(table, &table->cells[x][y], removals);
 			goto beginning;
 		}
 		
 		bool agree = false;
 		pair<pair<int, int>, Island *> removal;
-		BOOST_FOREACH(removal, whiteAlteration.removals)
+		BOOST_FOREACH(removal, whiteRemovals)
 		{
-			if (blackAlteration.removals.find(removal) != blackAlteration.removals.end())
+			if (blackRemovals.find(removal) != blackRemovals.end())
 			{
 				agree = true;
-				declareUnreachable(table, &table->cells[removal.first.first][removal.first.second], removal.second);
+				declareUnreachable(table, &table->cells[removal.first.first][removal.first.second], removal.second, removals);
 			}
 		}
 		
@@ -497,7 +496,7 @@ deeper:
 	goto deeper;
 }
 
-Table readTable(string filename)
+Table readTable(string filename, set<pair<pair<int, int>, Island *> > *removals)
 {
 	ifstream infile(filename.c_str());
 	string line;
@@ -549,8 +548,8 @@ Table readTable(string filename)
 	BOOST_FOREACH(Island *island, table.islands)
 	{
 		table.islandData[island] = IslandData();
-		whitenCell(&table, &table.cells[island->x][island->y]);
-		declareOwner(&table, &table.cells[island->x][island->y], island);
+		whitenCell(&table, &table.cells[island->x][island->y], removals);
+		declareOwner(&table, &table.cells[island->x][island->y], island, removals);
 	}
 	
 	return table;
@@ -599,10 +598,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 	
-	Table table = readTable(argv[1]);
+	set<pair<pair<int, int>, Island *> > removals;
+	Table table = readTable(argv[1], &removals);
 	//cout << "table is " << table.w << " x " << table.h << endl;
 	//dumpTable(table);
-	if (!solve(&table, table.w * table.h))
+	if (!solve(&table, table.w * table.h, &removals))
 		throw Unsolvable();
 	//dumpTable(table);
 	//cout << "DONE" << endl;
