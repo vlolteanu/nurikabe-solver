@@ -61,6 +61,9 @@ struct Table
 	
 	map<Island *, IslandData> islandData;
 	set<Island *> dirtyIslands;
+	
+	set<pair<pair<int, int>, Island *> > removals;
+	bool colorChange;
 };
 
 struct Unsolvable {};
@@ -99,10 +102,12 @@ bool blackenCell(Table *table, Cell *cell)
 	BOOST_FOREACH(Island *island, cell->possibleOwners)
 	{
 		table->dirtyIslands.insert(island);
+		table->removals.insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), island));
 	}
 	
 	cell->possibleOwners.clear();
 	cell->state = Cell::S_BLACK;
+	table->colorChange = true;
 	
 	table->greyCells.erase(pair<int, int>(cell->x, cell->y));
 	table->blackCells.insert(pair<int, int>(cell->x, cell->y));
@@ -122,6 +127,7 @@ bool whitenCell(Table *table, Cell *cell)
 		throw Unsolvable();
 	
 	cell->state = Cell::S_WHITE;
+	table->colorChange = true;
 	
 	table->dirtyIslands.insert(cell->possibleOwners.begin(), cell->possibleOwners.end());
 	
@@ -164,6 +170,7 @@ bool declareUnreachable(Table *table, Cell *cell, Island *island)
 	if (it == cell->possibleOwners.end())
 		return false;
 	
+	table->removals.insert(pair<pair<int, int>, Island *>(pair<int, int>(cell->x, cell->y), *it));
 	cell->possibleOwners.erase(it);
 	table->dirtyIslands.insert(island).second;
 	
@@ -395,9 +402,14 @@ void sanity(Table *table)
 		//cout << "checking reachability" << endl;
 		checkReachability(table);
 		//cout << "checking black reachability" << endl;
-		blackReachability(table);
-		//cout << "checking black squares" << endl;
-		checkBlackSquares(table);
+		if (table->colorChange)
+		{
+			blackReachability(table);
+			//cout << "checking black squares" << endl;
+			checkBlackSquares(table);
+			
+			table->colorChange = false;
+		}
 	}
 }
 
@@ -424,14 +436,16 @@ deeper:
 		int x = coords.first;
 		int y = coords.second;
 		
+		Table whiteAlteration(*table);
+		whiteAlteration.removals.clear();
 		try
 		{
-			Table alteration(*table);
+			
 			//cout << "assuming (" << i << "," << j << ") is white" << endl;
-			whitenCell(&alteration, &alteration.cells[x][y]);
-			if (solve(&alteration, depth - 1))
+			whitenCell(&whiteAlteration, &whiteAlteration.cells[x][y]);
+			if (solve(&whiteAlteration, depth - 1))
 			{
-				*table = alteration;
+				*table = whiteAlteration;
 				return true;
 			}
 		}
@@ -444,14 +458,15 @@ deeper:
 		
 		//cout << "meh" << endl;
 		
+		Table blackAlteration(*table);
+		blackAlteration.removals.clear();
 		try
 		{
-			Table alteration(*table);
 			//cout << "assuming (" << i << "," << j << ") is black" << endl;
-			blackenCell(&alteration, &alteration.cells[x][y]);
-			if (solve(&alteration, depth - 1))
+			blackenCell(&blackAlteration, &blackAlteration.cells[x][y]);
+			if (solve(&blackAlteration, depth - 1))
 			{
-				*table = alteration;
+				*table = blackAlteration;
 				return true;
 			}
 		}
@@ -461,6 +476,20 @@ deeper:
 			whitenCell(table, &table->cells[x][y]);
 			goto beginning;
 		}
+		
+		bool agree = false;
+		pair<pair<int, int>, Island *> removal;
+		BOOST_FOREACH(removal, whiteAlteration.removals)
+		{
+			if (blackAlteration.removals.find(removal) != blackAlteration.removals.end())
+			{
+				agree = true;
+				declareUnreachable(table, &table->cells[removal.first.first][removal.first.second], removal.second);
+			}
+		}
+		
+		if (agree)
+			goto beginning;
 		
 		//cout << "meh" << endl;
 	}
