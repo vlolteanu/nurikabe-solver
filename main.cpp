@@ -495,6 +495,38 @@ deeper:
 		//cout << "meh" << endl;
 	}
 	
+//	BOOST_FOREACH(coords, table->whiteCells)
+//	{
+//		int x = coords.first;
+//		int y = coords.second;
+		
+//		Cell *cell = &table->cells[x][y];
+//		if (cell->possibleOwners.size() > 1)
+//			continue;
+		
+//		BOOST_FOREACH(Island *island, cell->possibleOwners)
+//		{
+//			Table alteration(*table);
+//			set<pair<pair<int, int>, Island *> > alterationRemovals;
+//			try
+//			{
+//				declareOwner(&alteration, &alteration.cells[x][y], island, &alterationRemovals);
+//				if (solve(&alteration, depth - 1, &alterationRemovals))
+//				{
+//					cerr << "hola" << endl;
+//					*table = alteration;
+//					return true;
+//				}
+//			}
+//			catch(Unsolvable)
+//			{
+//				cerr << "hola" << endl;
+//				declareUnreachable(table, cell, island, removals);
+//				goto beginning;
+//			}
+//		}
+//	}
+	
 	goto deeper;
 }
 
