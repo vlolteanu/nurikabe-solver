@@ -96,6 +96,11 @@ bool blackenCell(Table *table, Cell *cell)
 	if (cell->state == Cell::S_BLACK)
 		return false;
 	
+	BOOST_FOREACH(Island *island, cell->possibleOwners)
+	{
+		table->dirtyIslands.insert(island);
+	}
+	
 	cell->possibleOwners.clear();
 	cell->state = Cell::S_BLACK;
 	
@@ -117,6 +122,8 @@ bool whitenCell(Table *table, Cell *cell)
 		throw Unsolvable();
 	
 	cell->state = Cell::S_WHITE;
+	
+	table->dirtyIslands.insert(cell->possibleOwners.begin(), cell->possibleOwners.end());
 	
 	table->greyCells.erase(pair<int, int>(cell->x, cell->y));
 	table->whiteCells.insert(pair<int, int>(cell->x, cell->y));
@@ -158,8 +165,7 @@ bool declareUnreachable(Table *table, Cell *cell, Island *island)
 		return false;
 	
 	cell->possibleOwners.erase(it);
-	if (table->dirtyIslands.insert(island).second);
-		//cout << "dirty" << endl;
+	table->dirtyIslands.insert(island).second;
 	
 	if (cell->possibleOwners.empty())
 	{
@@ -339,7 +345,6 @@ void checkReachability(Table *table)
 		}
 		
 		table->dirtyIslands.erase(island);
-		//cout << "clean" << endl;
 		
 		BOOST_FOREACH(coords, satellites)
 		{
